@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
   printf("Sent byte request (S) = %d\n", byte_request);
 
   /* Step 3: Start receiving packets from the server */
-  int corrupted_ack = 0;
+  int corrupted_ack = 0, last_correct_ack = cur_ack;
   srand(time(NULL));
   int recv_count = 0, good_count = 0;
   int i = 0, conn_alive = 1;
@@ -153,13 +153,14 @@ int main(int argc, char *argv[]) {
     switch (packet_actions[i]) {
     case 1:
       /* Simulate packet loss */
-      printf(" - Lost\n");
+      printf(" - Simulate loss\n");
       break;
     case 2:
       /* Simulate corrupted ACK, where client will be sending erroneous ACK
        * number which is SMALLER than real sequence number received */
-      corrupted_ack = cur_ack - (rand() % cur_ack) - 1;
+      corrupted_ack = rand() % last_correct_ack;
       corrupted_ack = (corrupted_ack > 0) ? corrupted_ack : 1;
+      printf(" - Simulate corrupted ACK");
     default:
       /* Recevied correctly. */
       if ((recv_packet.seq == cur_ack + 1) && (recv_packet.ack == cur_seq)) {
@@ -176,6 +177,7 @@ int main(int argc, char *argv[]) {
             corrupted_ack = 0;
           } else {
             send_packet.ack = cur_ack;
+            last_correct_ack = cur_ack;
           }
           send_packet.flag = ACK;
           send_packet.payload = 0;
@@ -192,7 +194,13 @@ int main(int argc, char *argv[]) {
           break;
         }
       } else {
-        printf(" - Expecting seq=%d, ack=%d, ignoring\n", cur_ack + 1, cur_seq);
+        printf(" - Expecting seq=%d, ack=%d, ignoring and resent the ACK\n", cur_ack + 1, cur_seq);
+        send_packet.seq = cur_seq;
+        send_packet.ack = cur_ack;
+        send_packet.flag = ACK;
+        send_packet.payload = 0;
+        sendto(sockfd, &send_packet, sizeof(Packet), 0,
+               (struct sockaddr *)&server_addr, addrlen);
       }
       break;
     }
@@ -202,6 +210,11 @@ int main(int argc, char *argv[]) {
 
   printf("%d of %d packets delivered in %d (expect %d) packets\n", good_count,
          byte_request, recv_count - 1, num_actions - 1);
+  if (recv_count == num_actions) {
+    printf("Test passed!\n");
+  } else {
+    printf("The number of packets needed to complete transmission is different from expected value.\n");
+  }
 
   /* Cleanup */
   close(sockfd);

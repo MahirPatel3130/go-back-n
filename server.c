@@ -115,27 +115,36 @@ int main(int argc, char *argv[]) {
           recvfrom(sockfd, &ack_pkt, sizeof(ack_pkt), 0, (struct sockaddr *)&client_addr, &addrlen);
 
           if (ack_pkt.flag == PKT_ACK) {
-            printf("Server: Received ACK for seq=%d\n\n", ack_pkt.ack);
+            if (ack_pkt.ack >= base && ack_pkt.ack < next_seq) {
+              printf("Server: Received valid cumulative ACK for seq=%d\n", ack_pkt.ack);
 
-            if (ack_pkt.ack == base) {
-              base++;  // Slide window forward
+              // Slide the window forward to the ACK value
+              base = ack_pkt.ack + 1;
               successful_windows++;
 
-              // Check if we can increase the window size back to the initial value
-              if (successful_windows == 2 && window_size < initial_window_size) {  // Restore to initial size (example)
+              printf("Server: Sliding window, new base=%d\n", base);
+
+              // Restore the window size after two successful windows
+              if (successful_windows == 2 && window_size < initial_window_size) {
                 window_size = initial_window_size;
                 successful_windows = 0;  // Reset counter
+                printf("Server: Restored window size to %d\n", window_size);
               }
+            } else {
+              printf("Server: Disregarded corrupted or unexpected ACK (seq=%d)\n", ack_pkt.ack);
             }
           }
         } else {
-          // Timeout occurred, reset window
+          // Timeout occurred, retransmit unacknowledged packets
           printf("Server: Timeout occurred, resending from base seq=%d\n", base);
-          next_seq = base;  // Retransmit from the base sequence number
+          next_seq = base;
+
           if (window_size > 1) {
-            window_size /= 2;  // Halve the window size on timeout
+            window_size /= 2;
+            printf("Server: Reduced window size to %d\n", window_size);
           }
-          successful_windows = 0;  // Reset successful windows counter
+
+          successful_windows = 0;  // Reset successful window counter
         }
       }
 
