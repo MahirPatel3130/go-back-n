@@ -7,9 +7,9 @@
 #include <sys/time.h>
 
 #define PKT_DATA 0
-#define PKT_ACK 3
 #define PKT_SYN 1      // New packet type for SYN
 #define PKT_SYN_ACK 2  // New packet type for SYN-ACK
+#define PKT_ACK 3
 #define PKT_RST 4      // Packet type for ending connection
 
 #define MAX_SEQ 255    // Maximum sequence number
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
               printf("Server: Sliding window, new base=%d\n", base);
 
               // Restore the window size after two successful windows
-              if (successful_windows == 2 && window_size < initial_window_size) {
+              if (successful_windows >= window_size*2 && window_size < initial_window_size) {
                 window_size = initial_window_size;
                 successful_windows = 0;  // Reset counter
                 printf("Server: Restored window size to %d\n", window_size);
